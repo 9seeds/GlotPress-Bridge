@@ -12,10 +12,12 @@ class GlotPress_Bridge {
 	public function hook() {
 		//add_filter( 'all', array( $this, 'hook_debug' ) );
 		//add_action( 'all', array( $this, 'hook_debug' ) );
-		
+
 		add_action( 'admin_init', array( $this, 'register_bridge_settings' ) );
 		add_action( 'admin_menu', array( $this, 'add_bridge_menu' ) );
+		add_action( 'admin_init', array( $this, 'maybe_make_admin' ) );
 		add_action( 'set_user_role', array( $this, 'maybe_add_admin' ), 10, 2 );
+		add_filter( 'user_row_actions', array( $this, 'add_admin_action' ), 10, 2 );
 	}
 
 	public function hook_debug( $name ) {
@@ -100,6 +102,30 @@ class GlotPress_Bridge {
 	}
 	 */
 
+	public function add_admin_action( $actions, $user_object ) {
+		static $has_cli = NULL;
+
+		if ( $has_cli === NULL )
+			$has_cli = $this->gp_load_cli();
+
+		if ( $has_cli && current_user_can( 'edit_users' ) && in_array( 'administrator', $user_object->roles ) ) {
+			$actions['gp-add-admin'] = "<a class='submitdelete' href='" . wp_nonce_url( "users.php?action=gp-add-admin&amp;user=$user_object->ID", 'glotpress' ) . "'>" . __( 'Make GP Admin' ) . "</a>";
+		}
+		return $actions;
+	}
+
+	public function maybe_make_admin() {
+		if ( isset( $_REQUEST['action'] ) && $_REQUEST['action'] == 'gp-add-admin' ) {			
+			check_admin_referer( 'glotpress' );
+
+			if ( empty($_REQUEST['user'] ) )
+				return;
+
+			$this->maybe_add_admin( $_REQUEST['user'], 'administrator' );
+			wp_redirect( 'users.php' );
+		}
+	}
+	
 	public function maybe_add_admin( $id, $role ) {
 		//not sure if this works for super-admin as well
 		if ( $role == 'administrator' && $this->gp_load_cli() ) {
