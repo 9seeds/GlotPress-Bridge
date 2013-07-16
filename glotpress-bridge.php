@@ -9,6 +9,8 @@ Author URI: http://9seeds.com
 
 class GlotPress_Bridge {
 
+	private $has_cli = NULL;
+
 	public function hook() {
 		//add_filter( 'all', array( $this, 'hook_debug' ) );
 		//add_action( 'all', array( $this, 'hook_debug' ) );
@@ -103,12 +105,7 @@ class GlotPress_Bridge {
 	 */
 
 	public function add_admin_action( $actions, $user_object ) {
-		static $has_cli = NULL;
-
-		if ( $has_cli === NULL )
-			$has_cli = $this->gp_load_cli();
-
-		if ( $has_cli && current_user_can( 'edit_users' ) && in_array( 'administrator', $user_object->roles ) ) {
+		if ( $this->gp_load_cli() && current_user_can( 'edit_users' ) && in_array( 'administrator', $user_object->roles ) ) {
 			$actions['gp-add-admin'] = "<a class='submitdelete' href='" . wp_nonce_url( "users.php?action=gp-add-admin&amp;user=$user_object->ID", 'glotpress' ) . "'>" . __( 'Make GP Admin' ) . "</a>";
 		}
 		return $actions;
@@ -118,7 +115,7 @@ class GlotPress_Bridge {
 		if ( isset( $_REQUEST['action'] ) && $_REQUEST['action'] == 'gp-add-admin' ) {			
 			check_admin_referer( 'glotpress' );
 
-			if ( empty($_REQUEST['user'] ) )
+			if ( empty( $_REQUEST['user'] ) )
 				return;
 
 			$this->maybe_add_admin( $_REQUEST['user'], 'administrator' );
@@ -138,12 +135,17 @@ class GlotPress_Bridge {
 	 * A hack, but should work in at least some instances
 	 */
 	private function gp_load_cli( &$output = NULL ) {
+		if ( $this->has_cli !== NULL )
+			return $this->has_cli;
+
 		exec( 'php -v', $output, $return );
 
 		//anything but zero (0) here is an error
 		if ( $return )
-			return false;
-		return true;
+		   	$this->has_cli = false;
+		else
+			$this->has_cli = true;
+		return $this->has_cli;
 	}
 	
 	private function add_admin_cli( $user_login ) {
